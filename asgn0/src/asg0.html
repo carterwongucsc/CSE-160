@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>CSE 160: Assignment 0</title>
+    <script src="../lib/cuon-matrix-cse160.js"></script>
+  </head>
+
+  <body onload="main()">
+    <div style="font-family: sans-serif; margin-bottom: 10px;">
+      <strong>Carter Wong</strong><br>
+      <a href="mailto:catwong@ucsc.edu">catwong@ucsc.edu</a>
+    </div>
+
+    <canvas id="cnv1" width="400" height="400" style="background-color: black;">
+      Please use a browser that supports "canvas"
+    </canvas>
+    
+    <br><br>
+
+    <label for="v1x">v1: x</label> <input type="text" id="v1x" size="3"> 
+    <label for="v1y">y</label> <input type="text" id="v1y" size="3">
+    <br>
+
+    <label for="v2x">v2: x</label> <input type="text" id="v2x" size="3"> 
+    <label for="v2y">y</label> <input type="text" id="v2y" size="3">
+    <br><br>
+
+    <input type="button" value="Draw" onclick="handleDrawEvent()">
+    
+    <br><br>
+
+    <label for="op-select">Operation:</label>
+    <select id="op-select">
+      <option value="add">Add</option>
+      <option value="sub">Sub</option>
+      <option value="mul">Mul</option>
+      <option value="div">Div</option>
+      <option value="mag">Magnitude</option>
+      <option value="norm">Normalize</option>
+      <option value="angle">Angle Between</option>
+      <option value="area">Area</option>
+    </select>
+
+    <label for="scalar">Scalar:</label>
+    <input type="text" id="scalar" size="3">
+    
+    <input type="button" value="Draw Operation" onclick="handleDrawOperationEvent()">
+
+    <script src="asg0.js"></script>
+  </body>
+</html>
