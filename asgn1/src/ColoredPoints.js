@@ -17,7 +17,7 @@ var FSHADER_SOURCE = `
 
 // Global State
 let canvas, gl, a_Position, u_FragColor, u_Size;
-let g_selectedColor = [1.0, 1.0, 1.0, 1.0];
+let g_selectedColor = [1.0, 0.0, 0.0, 1.0];
 let g_selectedSize = 10;
 let g_selectedSegments = 10;
 let g_selectedType = 'square';
