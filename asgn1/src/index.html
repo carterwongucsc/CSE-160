@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>CSE160 - Assignment 1</title>
+    <style>
+      .container {
+        display: flex;
+        flex-direction: row;
+        align-items: flex-start;
+        gap: 30px;
+        margin: 20px;
+      }
+      .drawing-label {
+        font-family: sans-serif;
+        font-weight: bold;
+        margin-bottom: 5px;
+      }
+      .slider-label {
+        display: inline-block;
+        width: 80px;
+      }
+    </style>
+  </head>
+
+  <body onload="main()">
+    <div class="container">
+      <div>
+        <canvas id="webgl" width="400" height="400">
+          Please use a browser that supports "canvas"
+        </canvas>
+      </div>
+
+      <div>
+        <div class="drawing-label">My Drawing</div>
+        <img src="IMG_3890.jpg" alt="Manual Reference" style="width: 400px; height: auto; border: 1px solid #ccc;">
+      </div>
+    </div>
+
+    <hr>
+
+    <p>
+      <button type="button" id="clearButton">Clear Canvas</button>
+      <button type="button" id="pictureButton">Draw My Picture</button>
+    </p>
+
+    <p>
+      <span class="slider-label">Red</span>
+      <input type="range" min="0" max="100" value="100" class="slider" id="redSlide">
+    </p>
+    <p>
+      <span class="slider-label">Green</span>
+      <input type="range" min="0" max="100" value="0" class="slider" id="greenSlide">
+    </p>
+    <p>
+      <span class="slider-label">Blue</span>
+      <input type="range" min="0" max="100" value="0" class="slider" id="blueSlide">
+    </p>
+
+    <p>
+      <span class="slider-label">Size</span>
+      <input type="range" min="5" max="40" value="10" class="slider" id="sizeSlide">
+    </p>
+    <p>
+      <span class="slider-label">Segments</span>
+      <input type="range" min="3" max="50" value="10" class="slider" id="segmentSlide">
+    </p>
+
+    <p>
+      <button type="button" id="squarebutton">Square</button>
+      <button type="button" id="triButton">Triangle</button>
+      <button type="button" id="circleButton">Circle</button>
+    </p>
+
+    <script src="../lib/webgl-utils.js"></script>
+    <script src="../lib/webgl-debug.js"></script>
+    <script src="../lib/cuon-utils.js"></script>
+    <script src="../lib/cuon-matrix.js"></script>
+
+    <script src="Square.js"></script>
+    <script src="Triangle.js"></script>
+    <script src="Circle.js"></script>
+
+    <script src="ColoredPoints.js"></script>
+  </body>
+</html>
