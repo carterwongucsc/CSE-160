@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>WebGL Fox - Hierarchical Animation</title>
+</head>
+<body onload="main()">
+    <canvas id="webgl" width="400" height="400">
+        Please use a browser that supports "canvas"
+    </canvas>
+    
+    <div id="perf">FPS: 0</div>
+    <hr>
+    <div>
+        Animation: 
+        <button id="animOn">ON</button>
+        <button id="animOff">OFF</button>
+        <p>Shift + Click on Canvas for a "Special Poke" Animation!</p>
+    </div>
+    
+    <div>
+        Global Rotation <input type="range" min="0" max="360" value="0" id="angleSlide">
+        Thigh Angle <input type="range" min="-45" max="45" value="0" id="thighSlide">
+        Calf Angle <input type="range" min="-45" max="45" value="0" id="calfSlide">
+    </div>
+
+    <script src="../lib/webgl-utils.js"></script>
+    <script src="../lib/webgl-debug.js"></script>
+    <script src="../lib/cuon-utils.js"></script>
+    <script src="../lib/cuon-matrix.js"></script>
+    
+    <script>
+        // SHADERS
+        const VSHADER_SOURCE = `
+            attribute vec4 a_Position;
+            uniform mat4 u_ModelMatrix;
+            uniform mat4 u_GlobalRotation;
+            void main() {
+                gl_Position = u_GlobalRotation * u_ModelMatrix * a_Position;
+            }`;
+
+        const FSHADER_SOURCE = `
+            precision mediump float;
+            uniform vec4 u_FragColor;
+            void main() {
+                gl_FragColor = u_FragColor;
+            }`;
+
+        // GLOBAL STATE
+        let gl, canvas, u_ModelMatrix, u_GlobalRotation, u_FragColor;
+        let g_globalAngle = 0, g_thighAngle = 0, g_calfAngle = 0, g_footAngle = 0;
+        let g_animation = false, g_startTime = 0, g_pokeTime = 0;
+        let g_isPoked = false;
+        let g_globalAngleY = 0; 
+        let g_isDragging = false;
+        let g_lastX = -1, g_lastY = -1;
+
+        function main() {
+            setupCanvas();
+            initShaders(gl, VSHADER_SOURCE, FSHADER_SOURCE);
+            connectVariables();
+            setupUI();
+            
+            gl.enable(gl.DEPTH_TEST);
+            gl.clearColor(0.1, 0.1, 0.1, 1.0);
+            
+            requestAnimationFrame(tick);
+        }
+
+        function setupCanvas() {
+            canvas = document.getElementById('webgl');
+            gl = canvas.getContext("webgl", { preserveDrawingBuffer: true });
+        }
+
+        function connectVariables() {
+            u_ModelMatrix = gl.getUniformLocation(gl.program, 'u_ModelMatrix');
+            u_GlobalRotation = gl.getUniformLocation(gl.program, 'u_GlobalRotation');
+            u_FragColor = gl.getUniformLocation(gl.program, 'u_FragColor');
+            a_Position = gl.getAttribLocation(gl.program, 'a_Position');
+        }
+
+        function setupUI() {
+            document.getElementById('angleSlide').addEventListener('input', function() { g_globalAngle = this.value; });
+            document.getElementById('thighSlide').addEventListener('input', function() { g_thighAngle = this.value; });
+            document.getElementById('calfSlide').addEventListener('input', function() { g_calfAngle = this.value; });
+            document.getElementById('animOn').onclick = () => g_animation = true;
+            document.getElementById('animOff').onclick = () => g_animation = false;
+            
+            canvas.onmousedown = function(ev) {
+                if(ev.shiftKey) { 
+                    g_isPoked = true; 
+                    g_pokeTime = performance.now()/1000; 
+                } else {
+                    // Start tracking for rotation
+                    g_isDragging = true;
+                    [g_lastX, g_lastY] = [ev.clientX, ev.clientY];
+                }
+            };
+
+            canvas.onmouseup = function(ev) { g_isDragging = false; };
+
+            canvas.onmousemove = function(ev) {
+                if (g_isDragging) {
+                    let dx = ev.clientX - g_lastX;
+                    let dy = ev.clientY - g_lastY;
+                    
+                    // Map X movement to Y-axis rotation and vice versa
+                    g_globalAngle = (g_globalAngle + dx) % 360;
+                    g_globalAngleY = (g_globalAngleY + dy) % 360;
+                    
+                    [g_lastX, g_lastY] = [ev.clientX, ev.clientY];
+                }
+            };
+        }
+
+        function drawCube(M, color) {
+            gl.uniformMatrix4fv(u_ModelMatrix, false, M.elements);
+            gl.uniform4f(u_FragColor, color[0], color[1], color[2], color[3]);
+            
+            // Simplified Cube Vertices
+            let vertices = new Float32Array([
+                0,0,0, 1,0,0, 1,1,0, 0,0,0, 1,1,0, 0,1,0, // Front
+                0,0,1, 1,0,1, 1,1,1, 0,0,1, 1,1,1, 0,1,1, // Back
+                0,1,0, 0,1,1, 1,1,1, 0,1,0, 1,1,1, 1,1,0, // Top
+                0,0,0, 0,0,1, 1,0,1, 0,0,0, 1,0,1, 1,0,0, // Bottom
+                0,0,0, 0,0,1, 0,1,1, 0,0,0, 0,1,1, 0,1,0, // Left
+                1,0,0, 1,0,1, 1,1,1, 1,0,0, 1,1,1, 1,1,0  // Right
+            ]);
+            
+            let buffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+            gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
+            gl.vertexAttribPointer(a_Position, 3, gl.FLOAT, false, 0, 0);
+            gl.enableVertexAttribArray(a_Position);
+            gl.drawArrays(gl.TRIANGLES, 0, 36);
+        }
+
+        function drawCylinder(M, color) {
+            gl.uniformMatrix4fv(u_ModelMatrix, false, M.elements);
+            gl.uniform4f(u_FragColor, color[0], color[1], color[2], color[3]);
+            let v = [];
+            for(let i=0; i<360; i+=20) {
+                let r1 = i * Math.PI/180; let r2 = (i+20) * Math.PI/180;
+                // Side Panel
+                v.push(Math.cos(r1), Math.sin(r1), 0, Math.cos(r2), Math.sin(r2), 0, Math.cos(r1), Math.sin(r1), 1);
+                v.push(Math.cos(r2), Math.sin(r2), 0, Math.cos(r2), Math.sin(r2), 1, Math.cos(r1), Math.sin(r1), 1);
+            }
+            let vertices = new Float32Array(v);
+            let buffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+            gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
+            gl.vertexAttribPointer(a_Position, 3, gl.FLOAT, false, 0, 0);
+            gl.enableVertexAttribArray(a_Position);
+            gl.drawArrays(gl.TRIANGLES, 0, v.length/3);
+        }
+
+        function updateAnimationAngles() {
+            let t = performance.now()/1000;
+            if (g_animation) {
+                g_thighAngle = 20 * Math.sin(t * 4);
+                g_calfAngle = 15 * Math.sin(t * 4);
+            }
+            if (g_isPoked) {
+                let p_time = t - g_pokeTime;
+                if(p_time < 1) { g_globalAngle += 10; } // Spin if poked
+                else { g_isPoked = false; }
+            }
+        }
+
+        function renderScene() {
+            let start = performance.now();
+            gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+            
+            // Global Rotation
+            let globalRot = new Matrix4()
+                .rotate(g_globalAngle, 0, 1, 0)  // Horizontal drag spins around Y
+                .rotate(g_globalAngleY, 1, 0, 0); // Vertical drag spins around X
+            gl.uniformMatrix4fv(u_GlobalRotation, false, globalRot.elements);
+
+            // --- 1. BODY---
+            let bodyMat = new Matrix4();
+            bodyMat.translate(-0.25, -0.1, -0.2); // Center the body
+            let bodyDraw = new Matrix4(bodyMat).scale(0.5, 0.3, 0.4);
+            drawCube(bodyDraw, [0.9, 0.4, 0.1, 1.0]); // Fox Orange
+
+            // --- 2. HEAD ---
+            let headMat = new Matrix4(bodyMat);
+            headMat.translate(0.1, 0.2, -0.2); // Move to front-top of body
+            headMat.rotate(g_animation ? 5 * Math.sin(performance.now()/500) : 0, 0, 1, 0); // Slight head tilt
+            let headDraw = new Matrix4(headMat).scale(0.3, 0.3, 0.3);
+            drawCube(headDraw, [0.9, 0.4, 0.1, 1.0]);
+
+            // --- 3. NOSE ---
+            let snoutMat = new Matrix4(headMat);
+            snoutMat.translate(0.075, 0.05, -0.1);
+            let snoutDraw = new Matrix4(snoutMat).scale(0.15, 0.1, 0.15);
+            drawCube(snoutDraw, [1, 1, 1, 1.0]); // White snout
+
+            // --- 4. EARS (Left & Right) ---
+            let leftEar = new Matrix4(headMat).translate(0.05, 0.3, 0.1).scale(0.05, 0.15, 0.05);
+            drawCube(leftEar, [0.2, 0.1, 0.0, 1.0]); // Dark ear tips
+            let rightEar = new Matrix4(headMat).translate(0.2, 0.3, 0.1).scale(0.05, 0.15, 0.05);
+            drawCube(rightEar, [0.2, 0.1, 0.0, 1.0]);
+
+            // --- 3b. EYES ---
+            // Left Eye
+            let leftEyeMat = new Matrix4(headMat);
+            leftEyeMat.translate(0.08, 0.18, -0.01);
+            leftEyeMat.scale(0.04, 0.04, 0.04);
+            drawCube(leftEyeMat, [0.1, 0.1, 0.1, 1.0]); // Black
+            
+            // Right Eye
+            let rightEyeMat = new Matrix4(headMat);
+            rightEyeMat.translate(0.18, 0.18, -0.01);
+            rightEyeMat.scale(0.04, 0.04, 0.04);
+            drawCube(rightEyeMat, [0.1, 0.1, 0.1, 1.0]); // Black
+
+            // Legs
+            const drawLeg = (offsetX, offsetZ, angleOffset) => {
+                let tAngle = g_animation ? 20 * Math.sin((performance.now()/1000 * 4) + angleOffset) : g_thighAngle;
+                let cAngle = g_animation ? 15 * Math.sin((performance.now()/1000 * 4) + angleOffset) : g_calfAngle;
+
+                // Thigh
+                let thighMat = new Matrix4(bodyMat).translate(offsetX, 0, offsetZ).rotate(tAngle, 1, 0, 0);
+                drawCube(new Matrix4(thighMat).scale(0.1, -0.2, 0.1), [0.9, 0.4, 0.1, 1.0]);
+
+                // Calf
+                let calfMat = new Matrix4(thighMat).translate(0, -0.2, 0).rotate(cAngle, 1, 0, 0);
+                drawCube(new Matrix4(calfMat).scale(0.09, -0.15, 0.09), [1, 1, 1, 1]);
+
+                // Foot
+                let footMat = new Matrix4(calfMat).translate(-0.01, -0.15, -0.05);
+                drawCube(new Matrix4(footMat).scale(0.12, -0.05, 0.15), [0.1, 0.1, 0.1, 1.0]);
+            };
+
+            drawLeg(0.05, 0.05, 0);           // Front Left
+            drawLeg(0.35, 0.05, Math.PI);     // Front Right (Opposite timing)
+            drawLeg(0.05, 0.30, Math.PI);     // Back Left (Opposite timing)
+            drawLeg(0.35, 0.30, 0);           // Back Right
+
+            // --- 6. TAIL (Cylinder) ---
+            let tailMat = new Matrix4(bodyMat);
+            tailMat.translate(0.25, 0.15, 0.4); // Attach to back
+            tailMat.rotate(-20 + (g_animation ? 15 * Math.sin(performance.now()/250) : 0), 1, 0, 0);
+            tailMat.scale(0.1, 0.1, 0.4);
+            drawCylinder(tailMat, [0.9, 0.4, 0.1, 1.0]);
+
+            // --- 7. TAIL TIP---
+            let tailTipMat = new Matrix4(tailMat);
+            tailTipMat.translate(0, 0, 1.0);
+            tailTipMat.scale(1.1, 1.1, 0.3);
+            drawCylinder(tailTipMat, [1, 1, 1, 1]);
+
+            let end = performance.now();
+            document.getElementById('perf').innerHTML = `FPS: ${Math.floor(1000/(end-start))}`;
+        }
+
+        function tick() {
+            updateAnimationAngles();
+            renderScene();
+            requestAnimationFrame(tick);
+        }
+    </script>
+</body>
+</html>
