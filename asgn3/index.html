@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Voxel World Full Assignment</title>
+  <style>
+    body { margin: 0; background: #111; color: white; font-family: Arial, sans-serif; }
+    #wrap { width: 800px; margin: 18px auto; }
+    canvas { display: block; border: 1px solid #333; cursor: crosshair; background: #6db7ff; }
+    #ui { margin-top: 10px; line-height: 1.4; }
+    #story { color: #ffd36a; }
+  </style>
+</head>
+<body onload="main()">
+  <div id="wrap">
+    <canvas id="webgl" width="800" height="600">
+      Please use a browser that supports canvas.
+    </canvas>
+    <div id="ui">
+      <b>Move:</b> WASD | <b>Turn:</b> Q/E or drag mouse | <b>Build:</b> Shift+Click | <b>Delete:</b> Click
+      <br><span id="story">Find all 5 crystals for the fox family, then return to the den.</span>
+      <br><span id="status">Loading textures...</span>
+    </div>
+  </div>
+
+  <script src="lib/webgl-utils.js"></script>
+  <script src="lib/webgl-debug.js"></script>
+  <script src="lib/cuon-utils.js"></script>
+  <script src="lib/cuon-matrix.js"></script>
+
+  <script src="src/Camera.js"></script>
+  <script src="src/Cube.js"></script>
+  <script src="src/World.js"></script>
+
+  <script id="vshader" type="x-shader/x-vertex">
+    attribute vec4 a_Position;
+    attribute vec2 a_UV;
+    varying vec2 v_UV;
+    uniform mat4 u_ModelMatrix;
+    uniform mat4 u_ViewMatrix;
+    uniform mat4 u_ProjectionMatrix;
+    void main() {
+      gl_Position = u_ProjectionMatrix * u_ViewMatrix * u_ModelMatrix * a_Position;
+      v_UV = a_UV;
+    }
+  </script>
+
+  <script id="fshader" type="x-shader/x-fragment">
+    precision mediump float;
+    varying vec2 v_UV;
+    uniform sampler2D u_Sampler0;
+    uniform sampler2D u_Sampler1;
+    uniform sampler2D u_Sampler2;
+    uniform sampler2D u_Sampler3;
+    uniform vec4 u_BaseColor;
+    uniform float u_TexWeight;
+    uniform int u_WhichTexture;
+    void main() {
+      vec4 texColor;
+      if (u_WhichTexture == 0) {
+        texColor = texture2D(u_Sampler0, v_UV);
+      } else if (u_WhichTexture == 1) {
+        texColor = texture2D(u_Sampler1, v_UV);
+      } else if (u_WhichTexture == 2) {
+        texColor = texture2D(u_Sampler2, v_UV);
+      } else {
+        texColor = texture2D(u_Sampler3, v_UV);
+      }
+      gl_FragColor = (1.0 - u_TexWeight) * u_BaseColor + u_TexWeight * texColor;
+    }
+  </script>
+</body>
+</html>
