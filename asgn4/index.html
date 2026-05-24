@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CSE 160 Lighting World</title>
+  <style>
+    body { margin: 0; overflow: hidden; font-family: Arial, sans-serif; background: #111; color: white; }
+    canvas { display: block; width: 100vw; height: 100vh; }
+    #ui {
+      position: fixed; top: 12px; left: 12px; z-index: 10;
+      width: 330px; padding: 12px; border-radius: 10px;
+      background: rgba(0, 0, 0, 0.70); line-height: 1.35;
+    }
+    #ui h2 { margin: 0 0 8px; font-size: 18px; }
+    #ui label { display: block; margin: 8px 0 3px; font-size: 13px; }
+    #ui input[type="range"] { width: 100%; }
+    button { margin: 3px 3px 3px 0; padding: 5px 8px; }
+    .row { margin-top: 6px; }
+    #status { margin-top: 8px; font-size: 13px; color: #d8f0ff; }
+    #help { font-size: 12px; color: #dddddd; }
+  </style>
+</head>
+<body onload="main()">
+  <div id="ui">
+    <h2>Lighting World</h2>
+    <div class="row">
+      <button id="lightingButton">Lighting: On</button>
+      <button id="normalButton">Normals: Off</button>
+    </div>
+    <div class="row">
+      <button id="pointButton">Point Light: On</button>
+      <button id="spotButton">Spot Light: On</button>
+      <button id="animateButton">Animate Light: On</button>
+    </div>
+    <label>Point light X</label><input id="lightX" type="range" min="-8" max="40" step="0.1" value="16" />
+    <label>Point light Y</label><input id="lightY" type="range" min="0" max="12" step="0.1" value="5" />
+    <label>Point light Z</label><input id="lightZ" type="range" min="-8" max="40" step="0.1" value="16" />
+    <label>Light red</label><input id="lightR" type="range" min="0" max="1" step="0.01" value="1" />
+    <label>Light green</label><input id="lightG" type="range" min="0" max="1" step="0.01" value="0.95" />
+    <label>Light blue</label><input id="lightB" type="range" min="0" max="1" step="0.01" value="0.82" />
+    <div id="help">Move: WASD, turn: Q/E or drag mouse. Shift-click adds blocks, click removes blocks.</div>
+    <div id="status">Loading...</div>
+  </div>
+
+  <canvas id="webgl" width="1200" height="800"></canvas>
+
+  <script id="vshader" type="x-shader/x-vertex">
+    precision mediump float;
+    attribute vec4 a_Position;
+    attribute vec2 a_UV;
+    attribute vec3 a_Normal;
+
+    uniform mat4 u_ModelMatrix;
+    uniform mat4 u_ViewMatrix;
+    uniform mat4 u_ProjectionMatrix;
+    uniform mat4 u_NormalMatrix;
+
+    varying vec2 v_UV;
+    varying vec3 v_Normal;
+    varying vec3 v_WorldPos;
+
+    void main() {
+      vec4 worldPos = u_ModelMatrix * a_Position;
+      gl_Position = u_ProjectionMatrix * u_ViewMatrix * worldPos;
+      v_UV = a_UV;
+      v_WorldPos = worldPos.xyz;
+      v_Normal = normalize((u_NormalMatrix * vec4(a_Normal, 0.0)).xyz);
+    }
+  </script>
+
+  <script id="fshader" type="x-shader/x-fragment">
+    precision mediump float;
+
+    varying vec2 v_UV;
+    varying vec3 v_Normal;
+    varying vec3 v_WorldPos;
+
+    uniform vec4 u_BaseColor;
+    uniform float u_TexWeight;
+    uniform int u_WhichTexture;
+    uniform sampler2D u_Sampler0;
+    uniform sampler2D u_Sampler1;
+    uniform sampler2D u_Sampler2;
+    uniform sampler2D u_Sampler3;
+
+    uniform vec3 u_CameraPos;
+    uniform vec3 u_LightPos;
+    uniform vec3 u_LightColor;
+    uniform vec3 u_SpotPos;
+    uniform vec3 u_SpotDir;
+    uniform vec3 u_SpotColor;
+    uniform float u_SpotCutoff;
+    uniform int u_UseLighting;
+    uniform int u_ShowNormals;
+    uniform int u_PointLightOn;
+    uniform int u_SpotLightOn;
+
+    vec4 chooseTexture() {
+      if (u_WhichTexture == 0) return texture2D(u_Sampler0, v_UV);
+      if (u_WhichTexture == 1) return texture2D(u_Sampler1, v_UV);
+      if (u_WhichTexture == 2) return texture2D(u_Sampler2, v_UV);
+      if (u_WhichTexture == 3) return texture2D(u_Sampler3, v_UV);
+      return u_BaseColor;
+    }
+
+    vec3 phongPoint(vec3 base, vec3 normal, vec3 viewDir, vec3 lightPos, vec3 lightColor) {
+      vec3 lightVec = lightPos - v_WorldPos;
+      float dist = length(lightVec);
+      vec3 lightDir = normalize(lightVec);
+      float nDotL = max(dot(normal, lightDir), 0.0);
+      vec3 diffuse = base * lightColor * nDotL;
+      vec3 reflectDir = reflect(-lightDir, normal);
+      float specularStrength = pow(max(dot(viewDir, reflectDir), 0.0), 32.0);
+      vec3 specular = 0.45 * specularStrength * lightColor;
+      float attenuation = 1.0 / (1.0 + 0.025 * dist + 0.002 * dist * dist);
+      return (diffuse + specular) * attenuation;
+    }
+
+    vec3 phongSpot(vec3 base, vec3 normal, vec3 viewDir) {
+      vec3 lightVec = u_SpotPos - v_WorldPos;
+      float dist = length(lightVec);
+      vec3 lightDir = normalize(lightVec);
+      float spotAmount = dot(normalize(-u_SpotDir), lightDir);
+      float cone = smoothstep(u_SpotCutoff, u_SpotCutoff + 0.08, spotAmount);
+      float nDotL = max(dot(normal, lightDir), 0.0);
+      vec3 diffuse = base * u_SpotColor * nDotL;
+      vec3 reflectDir = reflect(-lightDir, normal);
+      float specularStrength = pow(max(dot(viewDir, reflectDir), 0.0), 48.0);
+      vec3 specular = 0.55 * specularStrength * u_SpotColor;
+      float attenuation = 1.0 / (1.0 + 0.035 * dist + 0.003 * dist * dist);
+      return (diffuse + specular) * cone * attenuation;
+    }
+
+    void main() {
+      if (u_ShowNormals == 1) {
+        gl_FragColor = vec4(v_Normal * 0.5 + 0.5, 1.0);
+        return;
+      }
+
+      vec4 texColor = chooseTexture();
+      vec4 baseColor = mix(u_BaseColor, texColor, u_TexWeight);
+
+      if (u_UseLighting == 0) {
+        gl_FragColor = baseColor;
+        return;
+      }
+
+      vec3 normal = normalize(v_Normal);
+      vec3 viewDir = normalize(u_CameraPos - v_WorldPos);
+      vec3 base = baseColor.rgb;
+      vec3 ambient = 0.20 * base;
+      vec3 lit = ambient;
+
+      if (u_PointLightOn == 1) lit += phongPoint(base, normal, viewDir, u_LightPos, u_LightColor);
+      if (u_SpotLightOn == 1) lit += phongSpot(base, normal, viewDir);
+
+      gl_FragColor = vec4(min(lit, vec3(1.0)), baseColor.a);
+    }
+  </script>
+
+  <script src="lib/webgl-utils.js"></script>
+  <script src="lib/webgl-debug.js"></script>
+  <script src="lib/cuon-utils.js"></script>
+  <script src="lib/cuon-matrix.js"></script>
+  <script src="src/Camera.js"></script>
+  <script src="src/Cube.js"></script>
+  <script src="src/Sphere.js"></script>
+  <script src="src/Model.js"></script>
+  <script src="src/World.js"></script>
+</body>
+</html>
