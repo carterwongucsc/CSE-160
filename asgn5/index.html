@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Three.js Cosmic Garden</title>
+    <link rel="stylesheet" href="./src/styles.css" />
+
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+          "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <canvas id="scene"></canvas>
+
+    <section id="info-panel">
+      <h1>Cosmic Garden</h1>
+      <p>
+        A floating garden with animated crystals, lanterns, trees, a textured model,
+        multiple light sources, a textured skybox, and mouse orbit controls.
+      </p>
+      <p>
+        <strong></strong> Press <kbd>Space</kbd> or click the button to toggle
+        the crystal show. The crystals orbit, pulse, and receive a moving spotlight.
+      </p>
+      <button id="show-button">Toggle Crystal Show</button>
+    </section>
+
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>
